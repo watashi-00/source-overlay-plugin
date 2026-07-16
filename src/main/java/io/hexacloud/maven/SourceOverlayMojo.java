@@ -28,7 +28,6 @@ public class SourceOverlayMojo extends AbstractMojo {
 
         Path mainSources = projectRoot.resolve("java/src");
         Path java8Overlay = projectRoot.resolve("java/src-java8");
-        Path java21Overlay = projectRoot.resolve("java/src-java21");
 
         Path generatedSources = projectRoot.resolve("target/generated-sources/overlay");
 
@@ -51,11 +50,6 @@ public class SourceOverlayMojo extends AbstractMojo {
 
         getLog().info("");
 
-        getLog().info("Java 21 overlay:");
-        getLog().info("  " + java21Overlay);
-
-        getLog().info("");
-
         getLog().info("Generated sources:");
         getLog().info("  " + generatedSources);
 
@@ -67,6 +61,26 @@ public class SourceOverlayMojo extends AbstractMojo {
             copyDirectory(mainSources, generatedSources);
 
             getLog().info("Copied base sources.");
+
+            String releaseProp = project.getProperties().getProperty("maven.compiler.release");
+            int release = -1;
+            if (releaseProp != null) {
+                try {
+                    release = Integer.parseInt(releaseProp);
+                } catch (NumberFormatException ignored) {
+                }
+            }
+
+            getLog().info("Detected release: " + (releaseProp != null ? releaseProp : "<not set>"));
+
+            // Apply overlays only when targeting Java 8. For Java 21+ use the main java/src as-is.
+            if (release == 8) {
+                getLog().info("Applying Java 8 overlay...");
+                copyDirectory(java8Overlay, generatedSources);
+                getLog().info("Applied Java 8 overlay.");
+            } else {
+                getLog().info("No Java 8 overlay applied for maven.compiler.release=" + release);
+            }
 
         } catch (IOException e) {
             throw new MojoExecutionException("Failed to copy sources.", e);
