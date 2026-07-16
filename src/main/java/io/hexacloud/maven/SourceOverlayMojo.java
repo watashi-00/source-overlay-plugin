@@ -63,15 +63,21 @@ public class SourceOverlayMojo extends AbstractMojo {
             getLog().info("Copied base sources.");
 
             String releaseProp = project.getProperties().getProperty("maven.compiler.release");
-            int release = -1;
-            if (releaseProp != null) {
-                try {
-                    release = Integer.parseInt(releaseProp);
-                } catch (NumberFormatException ignored) {
-                }
-            }
+            String sourceProp = project.getProperties().getProperty("maven.compiler.source");
+            String targetProp = project.getProperties().getProperty("maven.compiler.target");
 
-            getLog().info("Detected release: " + (releaseProp != null ? releaseProp : "<not set>"));
+            int releaseFromProperty = extractMajorVersion(releaseProp);
+            int releaseFromSource = extractMajorVersion(sourceProp);
+            int releaseFromTarget = extractMajorVersion(targetProp);
+
+            int release = releaseFromProperty != -1 ? releaseFromProperty :
+                          releaseFromSource != -1 ? releaseFromSource :
+                          releaseFromTarget != -1 ? releaseFromTarget : -1;
+
+            getLog().info("Detected: release=" + (releaseProp != null ? releaseProp : "null") +
+                          ", source=" + (sourceProp != null ? sourceProp : "null") +
+                          ", target=" + (targetProp != null ? targetProp : "null"));
+            getLog().info("Resolved Java version: " + (release != -1 ? release : "unknown"));
 
             // Apply overlays only when targeting Java 8. For Java 21+ use the main java/src as-is.
             if (release == 8) {
@@ -132,5 +138,19 @@ public class SourceOverlayMojo extends AbstractMojo {
                         throw new RuntimeException(e);
                     }
                 });
+    }
+
+    private int extractMajorVersion(String versionProp) {
+        if (versionProp == null) return -1;
+        try {
+            versionProp = versionProp.trim();
+            if (versionProp.startsWith("1.")) {
+                return Integer.parseInt(versionProp.substring(2));
+            } else {
+                return Integer.parseInt(versionProp);
+            }
+        } catch (NumberFormatException e) {
+            return -1;
+        }
     }
 }
