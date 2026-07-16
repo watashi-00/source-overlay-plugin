@@ -1,6 +1,7 @@
 package io.hexacloud.maven;
 
 import java.nio.file.Path;
+import java.nio.file.Paths;
 
 import org.apache.maven.plugin.AbstractMojo;
 import org.apache.maven.plugin.MojoExecutionException;
@@ -28,6 +29,7 @@ public class SourceOverlayMojo extends AbstractMojo {
 
         Path mainSources = projectRoot.resolve("java/src");
         Path java8Overlay = projectRoot.resolve("java/src-java8");
+        Path java17Overlay = projectRoot.resolve("java/src-java17");
 
         Path generatedSources = projectRoot.resolve("target/generated-sources/overlay");
 
@@ -79,13 +81,16 @@ public class SourceOverlayMojo extends AbstractMojo {
                           ", target=" + (targetProp != null ? targetProp : "null"));
             getLog().info("Resolved Java version: " + (release != -1 ? release : "unknown"));
 
-            // Apply overlays only when targeting Java 8. For Java 21+ use the main java/src as-is.
             if (release == 8) {
                 getLog().info("Applying Java 8 overlay...");
                 copyDirectory(java8Overlay, generatedSources);
                 getLog().info("Applied Java 8 overlay.");
+            } else if (release == 17) {
+                getLog().info("Applying Java 17 overlay...");
+                copyDirectory(java17Overlay, generatedSources);
+                getLog().info("Applied Java 17 overlay.");
             } else {
-                getLog().info("No Java 8 overlay applied for maven.compiler.release=" + release);
+                getLog().info("No overlay applied for maven.compiler.release=" + release);
             }
 
         } catch (IOException e) {
@@ -103,6 +108,10 @@ public class SourceOverlayMojo extends AbstractMojo {
             try {
 
                 Path relative = source.relativize(path);
+                if (relative.startsWith(Paths.get("hexacloud/application"))) {
+                    return;
+                }
+
                 Path target = destination.resolve(relative);
 
                 if (Files.isDirectory(path)) {
