@@ -123,3 +123,7 @@ This ensures that intermediate compatibility overrides (like platform class over
 ## License
 
 This plugin is licensed under the MIT License.
+
+---
+
+Created and maintained by watashi-00 (watashi00 | Rodrigo).
