@@ -79,6 +79,26 @@ When the Maven build triggers the `overlay` goal during the `generate-sources` l
         -> Applies JDK 8 overlay next (src-java8) overwriting any previous implementation
 ```
 
+Here is a visual flowchart of the cascading lifecycle:
+
+```mermaid
+flowchart TD
+    Start([Start Build: mvn compile]) --> Detect[Detect Target JDK Version, e.g. V = 8]
+    Detect --> Recreate[Recreate Output: target/generated-sources/overlay]
+    Recreate --> CopyBase[Copy Main Sources src/main/java -> Output]
+    CopyBase --> Filter[Filter Overlays where jdkVersion >= V]
+    Filter --> Sort[Sort Overlays in Descending Version Order]
+    
+    subgraph Apply [Cascading Copy Overlay Files]
+        Sort --> Overlay1[Apply Higher JDK Overlay: JDK 17 src-java17]
+        Overlay1 -->|Overwrites Base Code| Overlay2[Apply Lower JDK Overlay: JDK 8 src-java8]
+        Overlay2 -->|Overwrites JDK 17 Code| Finish[Final Merged Source Tree]
+    end
+    
+    Finish --> Compiler[Compile Merged Sources using Target JDK 8]
+    Compiler --> End([Build Success])
+```
+
 This ensures that intermediate compatibility overrides (like platform class overrides written for Java 17) can be reused seamlessly by older profiles (like Java 8) without duplicating the actual source code files across folders.
 
 ---
