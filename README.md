@@ -24,7 +24,7 @@ Add the plugin declaration to your Maven project's `pom.xml`:
 <plugin>
     <groupId>com.github.watashi-00</groupId>
     <artifactId>source-overlay-plugin</artifactId>
-    <version>1.0.4</version>
+    <version>1.0.5</version>
     <configuration>
         <!-- The directory of the main/modern source code -->
         <mainSources>src/main/java</mainSources>
@@ -106,7 +106,7 @@ This ensures that intermediate compatibility overrides (like platform class over
 ## Logging Output Example
 
 ```text
-[INFO] --- overlay:1.0.4:overlay (default) @ your-project-artifact ---
+[INFO] --- overlay:1.0.5:overlay (default) @ your-project-artifact ---
 [INFO] Initializing source overlay generation.
 [INFO] Main sources directory: /path/to/project/src/main/java
 [INFO] Generated sources output: /path/to/project/target/generated-sources/overlay
