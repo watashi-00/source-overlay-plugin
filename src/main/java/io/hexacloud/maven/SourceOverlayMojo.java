@@ -12,6 +12,8 @@ import org.apache.maven.project.MavenProject;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.StandardCopyOption;
+import java.util.ArrayList;
+import java.util.List;
 
 @Mojo(
         name = "overlay",
@@ -22,46 +24,74 @@ public class SourceOverlayMojo extends AbstractMojo {
     @Parameter(defaultValue = "${project}", readonly = true, required = true)
     private MavenProject project;
 
+    @Parameter(defaultValue = "java/src")
+    private String mainSources;
+
+    @Parameter(defaultValue = "target/generated-sources/overlay")
+    private String generatedSources;
+
+    @Parameter
+    private List<String> excludes;
+
+    @Parameter
+    private List<OverlayConfig> overlays;
+
+    public static class OverlayConfig {
+        @Parameter(required = true)
+        private int jdkVersion;
+
+        @Parameter(required = true)
+        private String directory;
+
+        public int getJdkVersion() {
+            return jdkVersion;
+        }
+
+        public void setJdkVersion(int jdkVersion) {
+            this.jdkVersion = jdkVersion;
+        }
+
+        public String getDirectory() {
+            return directory;
+        }
+
+        public void setDirectory(String directory) {
+            this.directory = directory;
+        }
+
+        @Override
+        public String toString() {
+            return "Overlay[JDK " + jdkVersion + " -> " + directory + "]";
+        }
+    }
+
     @Override
     public void execute() throws MojoExecutionException {
-
         Path projectRoot = project.getBasedir().toPath();
 
-        Path mainSources = projectRoot.resolve("java/src");
-        Path java8Overlay = projectRoot.resolve("java/src-java8");
-        Path java17Overlay = projectRoot.resolve("java/src-java17");
-
-        Path generatedSources = projectRoot.resolve("target/generated-sources/overlay");
+        Path mainSourcesPath = projectRoot.resolve(mainSources != null ? mainSources : "java/src");
+        Path generatedSourcesPath = projectRoot.resolve(generatedSources != null ? generatedSources : "target/generated-sources/overlay");
 
         getLog().info("========================================");
-        getLog().info("Source Overlay Plugin");
+        getLog().info("Source Overlay Plugin (Dynamic)");
+        getLog().info("========================================");
+        getLog().info("Project: " + projectRoot);
+        getLog().info("Main sources: " + mainSourcesPath);
+        getLog().info("Generated sources: " + generatedSourcesPath);
+        if (excludes != null && !excludes.isEmpty()) {
+            getLog().info("Excludes: " + excludes);
+        }
+        if (overlays != null && !overlays.isEmpty()) {
+            getLog().info("Configured Overlays:");
+            for (OverlayConfig ov : overlays) {
+                getLog().info("  - " + ov);
+            }
+        }
         getLog().info("========================================");
 
-        getLog().info("Project:");
-        getLog().info("  " + projectRoot);
-
-        getLog().info("");
-
-        getLog().info("Main sources:");
-        getLog().info("  " + mainSources);
-
-        getLog().info("");
-
-        getLog().info("Java 8 overlay:");
-        getLog().info("  " + java8Overlay);
-
-        getLog().info("");
-
-        getLog().info("Generated sources:");
-        getLog().info("  " + generatedSources);
-
-        getLog().info("========================================");
         try {
-
-            deleteDirectory(generatedSources);
-
-            copyDirectory(mainSources, generatedSources);
-
+            deleteDirectory(generatedSourcesPath);
+            copyDirectory(mainSourcesPath, generatedSourcesPath);
             getLog().info("Copied base sources.");
 
             String releaseProp = project.getProperties().getProperty("maven.compiler.release");
@@ -76,29 +106,38 @@ public class SourceOverlayMojo extends AbstractMojo {
                           releaseFromSource != -1 ? releaseFromSource :
                           releaseFromTarget != -1 ? releaseFromTarget : -1;
 
-            getLog().info("Detected: release=" + (releaseProp != null ? releaseProp : "null") +
-                          ", source=" + (sourceProp != null ? sourceProp : "null") +
-                          ", target=" + (targetProp != null ? targetProp : "null"));
-            getLog().info("Resolved Java version: " + (release != -1 ? release : "unknown"));
+            getLog().info("Detected target Java version: " + (release != -1 ? release : "unknown"));
 
-            if (release == 8) {
-                getLog().info("Applying Java 8 overlay...");
-                copyDirectory(java8Overlay, generatedSources);
-                getLog().info("Applied Java 8 overlay.");
-            } else if (release == 17) {
-                getLog().info("Applying Java 17 overlay...");
-                copyDirectory(java17Overlay, generatedSources);
-                getLog().info("Applied Java 17 overlay.");
-            } else {
-                getLog().info("No overlay applied for maven.compiler.release=" + release);
+            if (release != -1 && overlays != null && !overlays.isEmpty()) {
+                // Find all matching overlays: overlay.jdkVersion >= release
+                List<OverlayConfig> matchingOverlays = new ArrayList<>();
+                for (OverlayConfig ov : overlays) {
+                    if (ov.getDirectory() != null && ov.getJdkVersion() >= release) {
+                        matchingOverlays.add(ov);
+                    }
+                }
+
+                if (!matchingOverlays.isEmpty()) {
+                    // Sort matching overlays in DESCENDING order of jdkVersion
+                    // (e.g. Java 17 is copied first, then Java 8 overlay overwrites/supplements it)
+                    matchingOverlays.sort((o1, o2) -> Integer.compare(o2.getJdkVersion(), o1.getJdkVersion()));
+
+                    for (OverlayConfig ov : matchingOverlays) {
+                        Path overlayPath = projectRoot.resolve(ov.getDirectory());
+                        getLog().info("Applying overlay: JDK " + ov.getJdkVersion() + " (" + ov.getDirectory() + ")...");
+                        copyDirectory(overlayPath, generatedSourcesPath);
+                    }
+                } else {
+                    getLog().info("No matching overlays found for Java version " + release);
+                }
             }
 
         } catch (IOException e) {
             throw new MojoExecutionException("Failed to copy sources.", e);
         }
     }
-    private void copyDirectory(Path source, Path destination) throws IOException {
 
+    private void copyDirectory(Path source, Path destination) throws IOException {
         if (!Files.exists(source)) {
             getLog().warn("Directory not found: " + source);
             return;
@@ -106,10 +145,18 @@ public class SourceOverlayMojo extends AbstractMojo {
 
         Files.walk(source).forEach(path -> {
             try {
-
                 Path relative = source.relativize(path);
-                if (relative.startsWith(Paths.get("hexacloud/application"))) {
-                    return;
+                
+                // Dynamic excludes check
+                if (excludes != null) {
+                    for (String exclude : excludes) {
+                        if (exclude != null && !exclude.trim().isEmpty()) {
+                            Path excludePath = Paths.get(exclude.trim());
+                            if (relative.startsWith(excludePath)) {
+                                return;
+                            }
+                        }
+                    }
                 }
 
                 Path target = destination.resolve(relative);
@@ -118,7 +165,6 @@ public class SourceOverlayMojo extends AbstractMojo {
                     Files.createDirectories(target);
                 } else {
                     Files.createDirectories(target.getParent());
-
                     Files.copy(
                             path,
                             target,
@@ -126,7 +172,6 @@ public class SourceOverlayMojo extends AbstractMojo {
                             StandardCopyOption.COPY_ATTRIBUTES
                     );
                 }
-
             } catch (IOException e) {
                 throw new RuntimeException(e);
             }
@@ -134,7 +179,6 @@ public class SourceOverlayMojo extends AbstractMojo {
     }
 
     private void deleteDirectory(Path directory) throws IOException {
-
         if (!Files.exists(directory))
             return;
 
