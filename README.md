@@ -3,20 +3,20 @@
 [![Java 8+](https://img.shields.io/badge/Java-8+-orange.svg)](https://openjdk.org/)
 [![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 
-A lightweight, highly configurable Maven plugin designed for projects supporting multiple JDK target versions from a single unified codebase. It dynamically merges base source code with version-specific compatibility overrides (overlays) during the `generate-sources` phase.
+A lightweight, highly configurable Maven plugin designed for multi-JDK builds from a single unified codebase. It dynamically merges base source code with version-specific compatibility overrides (overlays) during the `generate-sources` phase.
 
 ---
 
 ## Key Capabilities
 
 - 🛠️ **Dynamic Configuration:** Fully configure paths for main sources, generated sources, file exclusions, and version-specific overlays directly in your `pom.xml`.
-- 🔍 **Auto JDK Version Detection:** Resolves the target compilation version automatically by inspecting `maven.compiler.release`, `maven.compiler.source`, or `maven.compiler.target`.
+- 🔍 **Auto JDK Version Detection:** Resolves the target compilation version automatically by inspecting standard Maven compiler properties (`maven.compiler.release`, `maven.compiler.source`, or `maven.compiler.target`).
 - 🧬 **Cascading Version Inheritance:** When building for a lower Java release (e.g., JDK 8), the plugin automatically applies matching overlays (e.g., JDK 17 then JDK 8) in descending version order. This allows older overlays to extend and supplement intermediate versions, completely eliminating codebase duplication.
-- 🚫 **Dynamic Excludes:** Exclude specific directories or helper classes (such as demo applications) from being copied into the final generated source tree.
+- 🚫 **Dynamic Excludes:** Exclude specific directories or helper classes from being copied into the final generated source tree.
 
 ---
 
-## Installation
+## Installation & Configuration
 
 Add the plugin declaration to your Maven project's `pom.xml`:
 
@@ -27,25 +27,25 @@ Add the plugin declaration to your Maven project's `pom.xml`:
     <version>1.0.4</version>
     <configuration>
         <!-- The directory of the main/modern source code -->
-        <mainSources>java/src</mainSources>
+        <mainSources>src/main/java</mainSources>
         
         <!-- Target directory where the merged code will be generated -->
         <generatedSources>target/generated-sources/overlay</generatedSources>
         
         <!-- Files or directories relative to source roots to exclude -->
         <excludes>
-            <exclude>hexacloud/application</exclude>
+            <exclude>com/example/ignoredpackage</exclude>
         </excludes>
         
         <!-- Configured JDK version overlays -->
         <overlays>
             <overlay>
                 <jdkVersion>17</jdkVersion>
-                <directory>java/src-java17</directory>
+                <directory>src-java17</directory>
             </overlay>
             <overlay>
                 <jdkVersion>8</jdkVersion>
-                <directory>java/src-java8</directory>
+                <directory>src-java8</directory>
             </overlay>
         </overlays>
     </configuration>
@@ -75,27 +75,27 @@ When the Maven build triggers the `overlay` goal during the `generate-sources` l
 6. Sorts matching overlays in DESCENDING order of jdkVersion
 7. Applies overlays sequentially (overwriting duplicate files):
    e.g. For JDK 8 target:
-        -> Applies JDK 17 overlay first (java/src-java17)
-        -> Applies JDK 8 overlay next (java/src-java8) overwriting any previous implementation
+        -> Applies JDK 17 overlay first (src-java17)
+        -> Applies JDK 8 overlay next (src-java8) overwriting any previous implementation
 ```
 
-This ensures that intermediate compatibility overrides (like platform thread managers written for Java 17) can be reused seamlessly by older profiles (like Java 8) without duplicating the actual source code files across folders.
+This ensures that intermediate compatibility overrides (like platform class overrides written for Java 17) can be reused seamlessly by older profiles (like Java 8) without duplicating the actual source code files across folders.
 
 ---
 
 ## Logging Output Example
 
 ```text
-[INFO] --- overlay:1.0.4:overlay (default) @ gatebridge-core ---
+[INFO] --- overlay:1.0.4:overlay (default) @ your-project-artifact ---
 [INFO] Initializing source overlay generation.
-[INFO] Main sources directory: /path/to/project/java/src
+[INFO] Main sources directory: /path/to/project/src/main/java
 [INFO] Generated sources output: /path/to/project/target/generated-sources/overlay
-[INFO] Configured exclusions: [hexacloud/application]
-[INFO] Configured overlays: [Overlay[JDK 17 -> java/src-java17], Overlay[JDK 8 -> java/src-java8]]
+[INFO] Configured exclusions: [com/example/ignoredpackage]
+[INFO] Configured overlays: [Overlay[JDK 17 -> src-java17], Overlay[JDK 8 -> src-java8]]
 [INFO] Base sources copied successfully.
 [INFO] Resolved target Java version: 8
-[INFO] Applying JDK 17 overlay from: java/src-java17
-[INFO] Applying JDK 8 overlay from: java/src-java8
+[INFO] Applying JDK 17 overlay from: src-java17
+[INFO] Applying JDK 8 overlay from: src-java8
 ```
 
 ---
