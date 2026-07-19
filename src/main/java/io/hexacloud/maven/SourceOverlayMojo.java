@@ -72,27 +72,21 @@ public class SourceOverlayMojo extends AbstractMojo {
         Path mainSourcesPath = projectRoot.resolve(mainSources != null ? mainSources : "java/src");
         Path generatedSourcesPath = projectRoot.resolve(generatedSources != null ? generatedSources : "target/generated-sources/overlay");
 
-        getLog().info("========================================");
-        getLog().info("Source Overlay Plugin (Dynamic)");
-        getLog().info("========================================");
-        getLog().info("Project: " + projectRoot);
-        getLog().info("Main sources: " + mainSourcesPath);
-        getLog().info("Generated sources: " + generatedSourcesPath);
+        getLog().info("Initializing source overlay generation.");
+        getLog().debug("Project root: " + projectRoot);
+        getLog().info("Main sources directory: " + mainSourcesPath);
+        getLog().info("Generated sources output: " + generatedSourcesPath);
         if (excludes != null && !excludes.isEmpty()) {
-            getLog().info("Excludes: " + excludes);
+            getLog().info("Configured exclusions: " + excludes);
         }
         if (overlays != null && !overlays.isEmpty()) {
-            getLog().info("Configured Overlays:");
-            for (OverlayConfig ov : overlays) {
-                getLog().info("  - " + ov);
-            }
+            getLog().info("Configured overlays: " + overlays);
         }
-        getLog().info("========================================");
 
         try {
             deleteDirectory(generatedSourcesPath);
             copyDirectory(mainSourcesPath, generatedSourcesPath);
-            getLog().info("Copied base sources.");
+            getLog().info("Base sources copied successfully.");
 
             String releaseProp = project.getProperties().getProperty("maven.compiler.release");
             String sourceProp = project.getProperties().getProperty("maven.compiler.source");
@@ -106,7 +100,7 @@ public class SourceOverlayMojo extends AbstractMojo {
                           releaseFromSource != -1 ? releaseFromSource :
                           releaseFromTarget != -1 ? releaseFromTarget : -1;
 
-            getLog().info("Detected target Java version: " + (release != -1 ? release : "unknown"));
+            getLog().info("Resolved target Java version: " + (release != -1 ? release : "unknown"));
 
             if (release != -1 && overlays != null && !overlays.isEmpty()) {
                 // Find all matching overlays: overlay.jdkVersion >= release
@@ -124,11 +118,11 @@ public class SourceOverlayMojo extends AbstractMojo {
 
                     for (OverlayConfig ov : matchingOverlays) {
                         Path overlayPath = projectRoot.resolve(ov.getDirectory());
-                        getLog().info("Applying overlay: JDK " + ov.getJdkVersion() + " (" + ov.getDirectory() + ")...");
+                        getLog().info("Applying JDK " + ov.getJdkVersion() + " overlay from: " + ov.getDirectory());
                         copyDirectory(overlayPath, generatedSourcesPath);
                     }
                 } else {
-                    getLog().info("No matching overlays found for Java version " + release);
+                    getLog().info("No matching overlays configured for Java version " + release + ".");
                 }
             }
 
